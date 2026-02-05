@@ -2,7 +2,7 @@ name: "01 - Job dependencies in the same workflow (needs)"
 
 on:
   workflow_dispatch:
-  pull_request:
+  push:
     branches: ["main"]
 
 # For pushing containers to GHCR, we need packages: write.
