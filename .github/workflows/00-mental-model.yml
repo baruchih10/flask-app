@@ -1,0 +1,35 @@
+name: "00 - Mental Model (what runs when multiple workflow files exist)"
+
+# IMPORTANT TEACHING POINT:
+# - Each YAML file under .github/workflows is a separate workflow.
+# - GitHub decides to run a workflow ONLY if its `on:` matches the event.
+# - If multiple workflows match the same event, they can all run independently.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["main"]
+
+jobs:
+  explain:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain what is a workflow/job/step
+        run: |
+          echo "WORKFLOW = this YAML file"
+          echo "JOB      = a group of steps that runs on a runner (VM/container)"
+          echo "STEP     = either a shell command (run:) or an action (uses:)"
+          echo ""
+          echo "If you have many workflow YAML files:"
+          echo "- Each file is evaluated separately."
+          echo "- If this workflow has on: push, it runs on push."
+          echo "- Another workflow with on: push ALSO runs on push."
+          echo "- If another workflow is workflow_dispatch only, it will NOT run on push."
+
+      - name: Print event context (useful for debugging rules)
+        run: |
+          echo "github.event_name = ${{ github.event_name }}"
+          echo "github.ref        = ${{ github.ref }}"
+          echo "github.sha        = ${{ github.sha }}"
+          echo "github.actor      = ${{ github.actor }}"
+          echo "github.repository = ${{ github.repository }}"

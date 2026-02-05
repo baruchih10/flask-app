@@ -1,0 +1,89 @@
+name: "01 - Job dependencies in the same workflow (needs)"
+
+on:
+  workflow_dispatch:
+  pull_request:
+    branches: ["main"]
+
+# For pushing containers to GHCR, we need packages: write.
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Build the Docker image (local build only)"
+        run: |
+          # This builds the image inside the runner.
+          # We do not push yet; we just prove the Dockerfile builds.
+          docker build -t local/flask-actions-demo:sha-${{ github.sha }} .
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build  # <-- dependency: test waits for build to succeed
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: "Run a quick container smoke test"
+        run: |
+          set -e
+          docker build -t local/flask-actions-demo:sha-${{ github.sha }} .
+          docker run -d --name app -p 8080:8080 local/flask-actions-demo:sha-${{ github.sha }}
+          sleep 2
+          curl -fsS http://localhost:8080/health | cat
+          docker rm -f app
+
+  push_image:
+    runs-on: ubuntu-latest
+    needs: test  # <-- push waits for test
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Compute short SHA tag
+        id: meta
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          echo "tag=sha-${SHORT_SHA}" >> "$GITHUB_OUTPUT"
+          echo "TAG=sha-${SHORT_SHA}"
+
+      - name: "Login to GHCR (uses GITHUB_TOKEN)"
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: "Build and PUSH to GHCR"
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          # Tag includes owner/repo, and run number so students see unique tags.
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ steps.meta.outputs.tag }}
+
+
+
+# remark to share build amnd smoke test steps:
+  ##  docker save local/flask-actions-demo:sha-${{ github.sha }} -o image.tar
+  ## - uses: actions/upload-artifact@v4
+  ##  with:
+  ##    name: image
+  ##    path: image.tar
+
+
+# Then load in the next job:
+  ## - uses: actions/download-artifact@v4
+  ##  with:
+  ##    name: image
+  ## - name: Load image
+  ##   run: docker load -i image.tar
+
+# why not to do it ?
+  # slow
+  # large artifacts
+  # not how real CI/CD usually works
