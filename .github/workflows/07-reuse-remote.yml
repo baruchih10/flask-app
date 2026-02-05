@@ -1,0 +1,21 @@
+name: "07 - Reusing workflows from a different repo (cross-repo reusable workflow)"
+
+on:
+  workflow_dispatch:
+
+# NOTE:
+# This workflow will only work AFTER you publish the second repo (02-ci-library)
+# and change ORG/REPO + version tag.
+#
+# Example:
+#   uses: my-org/ci-library/.github/workflows/docker-build.yml@v1
+#
+# In class, this demonstrates "central CI library" like GitLab templates/includes.
+
+jobs:
+  build_from_library_repo:
+    uses: baruchih10/ci-library/.github/workflows/docker-build.yml@v1
+    with:
+      image_name: "flask-demo"
+      docker_context: "."
+    secrets: inherit

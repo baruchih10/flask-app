@@ -1,0 +1,23 @@
+name: "05 - Reusing workflows in the same repo (workflow dependencies)"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build_via_reusable:
+    # This calls the reusable workflow file in the SAME repo.
+    uses: ./.github/workflows/reusable-build.yml
+    with:
+      image_name: "flask-demo"
+    secrets: inherit
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build_via_reusable
+    steps:
+      - name: Use output from reusable workflow
+        run: |
+          echo "Reusable workflow returned image_tag:"
+          echo "${{ needs.build_via_reusable.outputs.image_tag }}"
+          echo ""
+          echo "In real life: deploy using that tag."

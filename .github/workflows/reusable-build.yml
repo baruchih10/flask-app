@@ -1,0 +1,52 @@
+name: "Reusable: Docker Build + Push (same repo)"
+
+# This workflow is callable by other workflows in the SAME repo
+# (and also by other repos if you choose, but for teaching we keep local use).
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        description: "Base image name (without registry)"
+        required: true
+        type: string
+    outputs:
+      image_tag:
+        description: "The tag created by the reusable build"
+        value: ${{ jobs.build.outputs.image_tag }}
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.tag }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: meta
+        name: Compute tag (step output -> job output -> workflow output)
+        run: |
+          # Use run_number so it's easy to see uniqueness in class
+          SHORT_SHA="${GITHUB_SHA::7}"
+          TAG="sha-${SHORT_SHA}"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "TAG=$TAG"
+
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build + Push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ inputs.image_name }}-${{ steps.meta.outputs.tag }}

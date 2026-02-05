@@ -1,0 +1,40 @@
+name: "09 - Conditional dependencies (success/failure/always)"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  may_fail:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Randomly fail (demo)
+        run: |
+          # This simulates flaky tests / failures
+          n=$((RANDOM % 2))
+          echo "Random = $n"
+          if [ "$n" -eq 0 ]; then
+            echo "Failing on purpose"
+            exit 1
+          fi
+          echo "Succeeded"
+
+  run_on_failure:
+    runs-on: ubuntu-latest
+    needs: may_fail
+    if: ${{ failure() }}   # runs only if may_fail failed
+    steps:
+      - run: echo "This runs only when the upstream job FAILED."
+
+  run_always:
+    runs-on: ubuntu-latest
+    needs: may_fail
+    if: ${{ always() }}    # runs regardless of success/failure
+    steps:
+      - run: echo "This runs always (good for cleanup, logs upload, etc.)."
+
+  run_on_success:
+    runs-on: ubuntu-latest
+    needs: may_fail
+    if: ${{ success() }}   # runs only if may_fail succeeded
+    steps:
+      - run: echo "This runs only when the upstream job SUCCEEDED."

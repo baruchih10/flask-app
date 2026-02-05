@@ -1,0 +1,51 @@
+name: "08 - Triggering workflows across repos (event dependency)"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  trigger_other_repo:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain repository_dispatch
+        run: |
+          echo "repository_dispatch triggers a workflow in ANOTHER repo."
+          echo "You must use a token (PAT) that has access to the target repo."
+          echo "Store it as a secret: DOWNSTREAM_PAT"
+          echo ""
+          echo "Then send a POST request to GitHub API /dispatches."
+
+      
+      # Generate PAT - click on your image
+        ## Settings -> Developer Settings -> Personal Access Tokens -> Generate new token
+        ## Name: DOWNSTREAM_PAT
+        ## Secret: (paste the token value here)
+        ## Click Save
+     
+      # Update secret in repo (UI)
+        # Open your repository on GitHub
+        # Go to Settings
+        # Click Secrets and variables → Actions
+        # Click New repository secret
+        # Fill in:
+        #   Name: DOWNSTREAM_PAT
+        #   Secret: (paste the token value here)
+        #   Click Save
+
+
+
+      - name: Trigger downstream (edit placeholders)
+        env:
+          TOKEN: ${{ secrets.DOWNSTREAM_PAT }}   # <-- create this secret
+          TARGET_REPO: "baruchih10/downstream-repo"
+          EVENT_TYPE: "promote"
+          TAG: "run-${{ github.run_number }}"
+        run: |
+          if [ -z "$TOKEN" ]; then
+            echo "DOWNSTREAM_PAT secret is missing. Add it in repo settings."
+            exit 1
+          fi
+
+          curl -fsS -X POST             -H "Accept: application/vnd.github+json"             -H "Authorization: Bearer $TOKEN"             https://api.github.com/repos/${TARGET_REPO}/dispatches             -d "{"event_type":"${EVENT_TYPE}","client_payload":{"tag":"${TAG}"}}"
+
+          echo "Triggered ${TARGET_REPO} with event_type=${EVENT_TYPE}, tag=${TAG}"
