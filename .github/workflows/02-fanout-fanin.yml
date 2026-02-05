@@ -1,0 +1,43 @@
+name: "02 - Fan-out / Fan-in (parallel jobs + merge gate)"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  unit_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Unit tests (demo)
+        run: |
+          echo "Unit tests are usually fast"
+          echo "Pretend: pytest -q"
+
+  integration_tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Integration tests (demo)
+        run: |
+          echo "Integration tests might start containers/db"
+          echo "Pretend: docker compose up + run tests"
+
+  security_scan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Security scan (demo)
+        run: |
+          echo "Pretend: trivy fs . or pip-audit"
+
+  gate:
+    runs-on: ubuntu-latest
+
+    # Fan-in: gate waits for ALL parallel jobs
+    needs: [unit_tests, integration_tests, security_scan]
+
+    steps:
+      - name: Gate passed
+        run: |
+          echo "All dependencies finished successfully."
+          echo "This is where you'd allow deploy/push."

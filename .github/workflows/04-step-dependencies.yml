@@ -1,0 +1,31 @@
+name: "04 - Step-to-step dependencies (actions inside a job)"
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  docker_flow:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Step dependency is simply "order":
+      # This login MUST happen before push.
+      - name: Login to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # Another step depends on previous step being successful.
+      - name: Build and Push (depends on login above)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:step-demo-sha-${{ github.sha }}

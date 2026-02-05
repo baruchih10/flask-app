@@ -1,0 +1,61 @@
+name: "03 - Passing data between jobs (outputs + artifacts)"
+
+on:
+  workflow_dispatch:
+
+jobs:
+  compute_version:
+    runs-on: ubuntu-latest
+
+    # Job outputs: expose data to downstream jobs via needs.<job>.outputs.<name>
+    outputs:
+      version: ${{ steps.v.outputs.version }}
+
+    steps:
+      - name: Compute version (step output)
+        id: v
+        run: |
+          # Step outputs are created by writing to $GITHUB_OUTPUT.
+          # Anything you write there becomes steps.<id>.outputs.<key>
+          # Version derived from commit SHA (stable across re-runs)
+          SHORT_SHA="${GITHUB_SHA::7}"
+          VERSION="1.0.${SHORT_SHA}"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Computed VERSION=$VERSION"
+
+  build_artifact:
+    runs-on: ubuntu-latest
+    needs: compute_version
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create a build folder (demo)
+        run: |
+          mkdir -p dist
+          echo "version=${{ needs.compute_version.outputs.version }}" > dist/version.txt
+          echo "This file proves artifacts can move files across jobs." > dist/README.txt
+          ls -la dist
+
+      # Upload artifact so another job can download it.
+      - name: Upload artifact (dist/)
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+  consume_artifact:
+    runs-on: ubuntu-latest
+    needs: build_artifact
+    steps:
+      - name: Download artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist
+
+      - name: Show downloaded files
+        run: |
+          echo "Downloaded artifact content:"
+          ls -la dist
+          echo "---"
+          cat dist/version.txt
