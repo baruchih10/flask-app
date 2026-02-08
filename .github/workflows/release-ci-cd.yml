@@ -136,7 +136,7 @@ jobs:
           echo "ACI smoke test failed"
           exit 1
 
-    deploy_aca:
+  deploy_aca:
     name: Deploy to ACA
     runs-on: ubuntu-latest
     needs: [build_push, deploy_aci]
