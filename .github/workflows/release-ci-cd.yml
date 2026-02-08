@@ -69,7 +69,7 @@ jobs:
     name: Deploy to ACI (smoke)
     runs-on: ubuntu-latest
     needs: build_push
-    environment: ${{ github.event_name == 'release' && 'production' || inputs.environment }}
+    environment: ${{ github.event_name == 'release' && 'dev' || inputs.environment }}
 
     steps:
       - name: Azure login (OIDC)
@@ -82,14 +82,10 @@ jobs:
       - name: Deploy ACI (name + dns vary by environment)
         env:
           TAG: ${{ needs.build_push.outputs.tag }}
-
-          # Shared repo variables
           RG:  ${{ vars.RESOURCE_GROUP }}
           LOC: ${{ vars.AZURE_LOCATION }}
           ACR: ${{ vars.ACR_LOGIN_SERVER }}
           ID:  ${{ vars.RUNTIME_PULL_IDENTITY_ID }}
-
-          # Environment variables (dev/stage/prod)
           CG:  ${{ vars.ACI_CONTAINER_GROUP_NAME }}
           DNS: ${{ vars.ACI_DNS_LABEL }}
         run: |
@@ -103,11 +99,13 @@ jobs:
             --name "$CG" \
             --location "$LOC" \
             --image "$IMAGE" \
+            --os-type Linux \
             --dns-name-label "$DNS" \
             --ports "${{ env.CONTAINER_PORT }}" \
             --assign-identity "$ID" \
             --acr-identity "$ID" \
             --restart-policy Always
+
 
       - name: Smoke test ACI (http://fqdn:5000/)
         env:
