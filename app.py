@@ -9,7 +9,15 @@ def root():
     return jsonify({
         "service": "flask-actions-demo",
         "message": "Hello from Flask",
-        "port": int(os.environ.get("PORT", "8080"))
+        "port": int(os.environ.get("PORT", "5000"))
+    })
+
+
+@app.get("/my-name")
+def my_name():
+    # A simple endpoint so students can see the container is alive.
+    return jsonify({
+        "my-name is": "King Baruchi"
     })
 
 @app.get("/health")
@@ -18,5 +26,5 @@ def health():
 
 if __name__ == "__main__":
     # Bind to 0.0.0.0 so Docker can publish the port properly.
-    port = int(os.environ.get("PORT", "8080"))
+    port = int(os.environ.get("PORT", "5000"))
     app.run(host="0.0.0.0", port=port)
