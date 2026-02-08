@@ -21,12 +21,12 @@ def my_name():
     })
 
 
-app.get("/release-2")
+@app.get("/release-2")
 def release_2():
     return jsonify({"living in release": "2.0.0"})
 
 
-app.get("/release-3")
+@app.get("/release-3")
 def release_3():
     return jsonify({"living in release": "3.0.0"})
 
