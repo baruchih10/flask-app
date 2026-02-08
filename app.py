@@ -20,9 +20,10 @@ def my_name():
         "my-name is": "King Baruchi"
     })
 
-@app.get("/health")
-def health():
-    return jsonify({"status": "ok"})
+
+app.get("/release-2")
+def release_2():
+    return jsonify({"living in release": "2.0.0"})
 
 if __name__ == "__main__":
     # Bind to 0.0.0.0 so Docker can publish the port properly.
