@@ -1,0 +1,158 @@
+name: Release CI/CD - Build to ACR, Deploy ACI then ACA
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: choice
+        description: "Deploy target environment (affects ACI name/DNS)"
+        required: true
+        options: [dev, stage, production]
+
+permissions:
+  id-token: write
+  contents: read
+
+env:
+  # Shared config from Repository Variables
+  IMAGE_REPO: ${{ vars.IMAGE_REPO }}
+  CONTAINER_PORT: ${{ vars.CONTAINER_PORT }}
+
+jobs:
+  build_push:
+    name: Build & Push image to ACR (by tag)
+    runs-on: ubuntu-latest
+    environment: ${{ github.event_name == 'release' && 'production' || inputs.environment }}
+
+    outputs:
+      tag: ${{ steps.vars.outputs.tag }}
+
+    steps:
+      - name: Extract tag
+        id: vars
+        run: |
+          TAG="${{ github.event.release.tag_name }}"
+          if [ -z "$TAG" ]; then TAG="${{ github.ref_name }}"; fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v4
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Login to ACR
+        env:
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+        run: |
+          # ACR name is the first label: myacr.azurecr.io -> myacr
+          ACR_NAME="$(echo "$ACR_LOGIN_SERVER" | cut -d. -f1)"
+          az acr login --name "$ACR_NAME"
+
+      - name: Build & push image (tagged)
+        env:
+          TAG: ${{ steps.vars.outputs.tag }}
+          ACR_LOGIN_SERVER: ${{ vars.ACR_LOGIN_SERVER }}
+        run: |
+          IMAGE="$ACR_LOGIN_SERVER/${{ env.IMAGE_REPO }}:$TAG"
+          echo "Building: $IMAGE"
+
+          docker build -t "$IMAGE" .
+          docker push "$IMAGE"
+
+  deploy_aci:
+    name: Deploy to ACI (smoke)
+    runs-on: ubuntu-latest
+    needs: build_push
+    environment: ${{ github.event_name == 'release' && 'production' || inputs.environment }}
+
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy ACI (name + dns vary by environment)
+        env:
+          TAG: ${{ needs.build_push.outputs.tag }}
+
+          # Shared repo variables
+          RG:  ${{ vars.RESOURCE_GROUP }}
+          LOC: ${{ vars.AZURE_LOCATION }}
+          ACR: ${{ vars.ACR_LOGIN_SERVER }}
+          ID:  ${{ vars.RUNTIME_PULL_IDENTITY_ID }}
+
+          # Environment variables (dev/stage/prod)
+          CG:  ${{ vars.ACI_CONTAINER_GROUP_NAME }}
+          DNS: ${{ vars.ACI_DNS_LABEL }}
+        run: |
+          IMAGE="$ACR/${{ env.IMAGE_REPO }}:$TAG"
+          echo "Deploying ACI image: $IMAGE"
+          echo "ACI Container Group: $CG"
+          echo "ACI DNS Label: $DNS"
+
+          az container create \
+            --resource-group "$RG" \
+            --name "$CG" \
+            --location "$LOC" \
+            --image "$IMAGE" \
+            --dns-name-label "$DNS" \
+            --ports "${{ env.CONTAINER_PORT }}" \
+            --assign-identity "$ID" \
+            --acr-identity "$ID" \
+            --restart-policy Always
+
+      - name: Smoke test ACI (http://fqdn:5000/)
+        env:
+          RG: ${{ vars.RESOURCE_GROUP }}
+          CG: ${{ vars.ACI_CONTAINER_GROUP_NAME }}
+        run: |
+          FQDN="$(az container show -g "$RG" -n "$CG" --query "ipAddress.fqdn" -o tsv)"
+          URL="http://$FQDN:${{ env.CONTAINER_PORT }}/"
+          echo "Testing: $URL"
+
+          for i in {1..30}; do
+            if curl -fsS "$URL" >/dev/null; then
+              echo "ACI OK"
+              exit 0
+            fi
+            sleep 5
+          done
+          echo "ACI smoke test failed"
+          exit 1
+
+  deploy_aca:
+    name: Deploy to ACA
+    runs-on: ubuntu-latest
+    needs: deploy_aci
+    environment: ${{ github.event_name == 'release' && 'production' || inputs.environment }}
+
+    steps:
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Deploy to ACA (same ACA for all envs)
+        env:
+          TAG: ${{ needs.build_push.outputs.tag }}
+          RG:  ${{ vars.RESOURCE_GROUP }}
+          APP: ${{ vars.ACA_NAME }}
+          ACR: ${{ vars.ACR_LOGIN_SERVER }}
+        run: |
+          IMAGE="$ACR/${{ env.IMAGE_REPO }}:$TAG"
+          echo "Deploying ACA image: $IMAGE"
+
+          az containerapp update \
+            --name "$APP" \
+            --resource-group "$RG" \
+            --image "$IMAGE"
