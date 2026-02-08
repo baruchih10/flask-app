@@ -108,6 +108,15 @@ jobs:
             --acr-identity "$ID" \
             --restart-policy Always
 
+      - name: Show ACI logs (debug)
+        if: always()
+        env:
+          RG: ${{ vars.RESOURCE_GROUP }}
+          CG: ${{ vars.ACI_CONTAINER_GROUP_NAME }}
+        run: |
+          echo "=== ACI LOGS ==="
+          az container logs -g "$RG" -n "$CG" || true
+
       - name: Smoke test ACI (http://fqdn:5000/)
         env:
           RG: ${{ vars.RESOURCE_GROUP }}
