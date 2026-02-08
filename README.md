@@ -15,15 +15,15 @@ python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 python app.py
-# open http://localhost:8080/health
+# open http://localhost:5000/health
 ```
 
 ## Quick start (Docker)
 
 ```bash
 docker build -t flask-actions-demo:local .
-docker run --rm -p 8080:8080 flask-actions-demo:local
-# open http://localhost:8080/health
+docker run --rm -p 5000:5000 flask-actions-demo:local
+# open http://localhost:5000/health
 ```
 
 ---
