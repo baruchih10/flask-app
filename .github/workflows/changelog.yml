@@ -1,23 +1,28 @@
-name: Generate CHANGELOG
+name: Generate CHANGELOG (on Release)
 
 on:
   workflow_dispatch:
-  push:
-    tags:
-      - "v*"
+  release:
+    types: [published]
+    
+  # push:
+  #   tags:
+  #   - "v*"
 
 permissions:
   contents: write
+  pull-requests: write
   issues: read
-  pull-requests: read
 
 jobs:
   changelog:
     runs-on: ubuntu-latest
     steps:
+      # Checkout the exact released tag commit
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ github.event.release.tag_name }}
 
       - name: Generate changelog
         uses: heinrichreimer/action-github-changelog-generator@v2.4
@@ -25,16 +30,19 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           output: CHANGELOG.md
 
-      - name: Commit & push CHANGELOG.md
-        run: |
-          if git diff --quiet; then
-            echo "No changes to CHANGELOG.md"
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          git add CHANGELOG.md
-          git commit -m "docs(changelog): update [skip ci]"
-          git push
+      # Now create a PR to main with the updated CHANGELOG.md
+      - name: Create PR with CHANGELOG.md
+        uses: peter-evans/create-pull-request@v6
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          branch: automation/changelog-${{ github.event.release.tag_name }}
+          base: main
+          title: docs(changelog): update for ${{ github.event.release.tag_name }}
+          commit-message: docs(changelog): update for ${{ github.event.release.tag_name }}
+          body: |
+            Auto-generated changelog update triggered by published release:
+            - Tag: ${{ github.event.release.tag_name }}
+            - Release: ${{ github.event.release.html_url }}
+          add-paths: |
+            CHANGELOG.md
+          delete-branch: true
