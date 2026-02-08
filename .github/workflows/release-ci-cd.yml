@@ -93,19 +93,20 @@ jobs:
           echo "Deploying ACI image: $IMAGE"
           echo "ACI Container Group: $CG"
           echo "ACI DNS Label: $DNS"
-
           az container create \
             --resource-group "$RG" \
             --name "$CG" \
             --location "$LOC" \
             --image "$IMAGE" \
             --os-type Linux \
+            --ip-address Public \
             --dns-name-label "$DNS" \
-            --ports "${{ env.CONTAINER_PORT }}" \
+            --ports 5000 \
+            --cpu 1 \
+            --memory 1.5 \
             --assign-identity "$ID" \
             --acr-identity "$ID" \
             --restart-policy Always
-
 
       - name: Smoke test ACI (http://fqdn:5000/)
         env:
