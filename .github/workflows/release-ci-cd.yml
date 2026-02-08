@@ -24,7 +24,7 @@ jobs:
   build_push:
     name: Build & Push image to ACR (by tag)
     runs-on: ubuntu-latest
-    environment: ${{ github.event_name == 'release' && 'production' || inputs.environment }}
+    environment: ${{ github.event_name == 'release' && 'dev' || inputs.environment }}
 
     outputs:
       tag: ${{ steps.vars.outputs.tag }}
