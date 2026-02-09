@@ -21,6 +21,14 @@ def my_name():
     })
 
 
+@app.get("/ai")
+def ai():
+    # A simple endpoint so students can see the container is alive.
+    return jsonify({
+        "invoke_ai": "predict next buy"
+    })
+
+
 @app.get("/release-2")
 def release_2():
     return jsonify({"living in release": "2.0.0"})
